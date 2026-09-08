@@ -17,6 +17,7 @@ class Student(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
+    hashed_password = Column(String, nullable=True)
     grade_level = Column(Integer)
     gpa = Column(Float, nullable=True)
     is_enrolled = Column(Boolean, default=True)

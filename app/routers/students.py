@@ -5,6 +5,8 @@ from typing import Optional
 from app.database import get_db
 from app.models.students import Student
 from app.schemas.students import StudentCreate, StudentUpdate, StudentPatch, StudentResponse
+from app.utils.security import get_current_user
+
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -17,7 +19,11 @@ def get_student_or_404(db: Session, student_id: int) -> Student:
 
 # CREATE
 @router.post("/", response_model=StudentResponse, status_code=201)
-def create_student(student: StudentCreate, db: Session = Depends(get_db)):
+def create_student(
+    student: StudentCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
     """Create a new student"""
     db_student = Student(**student.model_dump())
     try:
@@ -61,6 +67,12 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
     """Get a specific student by ID"""
     return get_student_or_404(db, student_id)
 
+# READ (current user)
+@router.get("/me", response_model=StudentResponse)
+def get_my_profile(current_user: Student = Depends(get_current_user)):
+    """Return the authenticated user's profile."""
+    return current_user
+
 # UPDATE (full - PUT)
 @router.put("/{student_id}", response_model=StudentResponse)
 def update_student(student_id: int, student_data: StudentUpdate, db: Session = Depends(get_db)):
@@ -74,7 +86,12 @@ def update_student(student_id: int, student_data: StudentUpdate, db: Session = D
 
 # UPDATE (partial - PATCH)
 @router.patch("/{student_id}", response_model=StudentResponse)
-def patch_student(student_id: int, student_data: StudentPatch, db: Session = Depends(get_db)):
+def patch_student(
+    student_id: int,
+    student_data: StudentPatch,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
     """Partially update a student, only changing provided fields."""
     db_student = get_student_or_404(db, student_id)
     update_data = student_data.model_dump(exclude_unset=True)
@@ -86,7 +103,11 @@ def patch_student(student_id: int, student_data: StudentPatch, db: Session = Dep
 
 # DELETE 
 @router.delete("/{student_id}", status_code=204)
-def delete_student(student_id: int, db: Session = Depends(get_db)):
+def delete_student(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
     """Delete a student"""
     db_student = get_student_or_404(db, student_id)
     db.delete(db_student)

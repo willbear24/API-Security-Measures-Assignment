@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.config import settings
-from app.routers import students
+from app.routers import auth, students
 from app.database import engine, Base
 
 app = FastAPI(
@@ -12,3 +12,4 @@ app = FastAPI(
 Base.metadata.create_all(bind=engine) # Creates the table if it not exist
 
 app.include_router(students.router)
+app.include_router(auth.router)
