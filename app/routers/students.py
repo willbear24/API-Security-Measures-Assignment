@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.students import Student
 from app.schemas.students import StudentCreate, StudentUpdate, StudentPatch, StudentResponse
 from app.utils.security import get_current_user
+from app.utils.notifcations import send_notification, log_activity
 
 
 router = APIRouter(prefix="/students", tags=["Students"])
@@ -21,18 +22,36 @@ def get_student_or_404(db: Session, student_id: int) -> Student:
 @router.post("/", response_model=StudentResponse, status_code=201)
 def create_student(
     student: StudentCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    """Create a new student"""
+    """Create a new student."""
     db_student = Student(**student.model_dump())
+
     try:
         db.add(db_student)
         db.commit()
         db.refresh(db_student)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Student with this email already exists.")
+        raise HTTPException(
+            status_code=409,
+            detail="Student with this email already exists.",
+        )
+
+    background_tasks.add_task(
+        send_notification,
+        email=db_student.email,
+        message=f"Hi {db_student.name}, welcome to our platform!",
+    )
+
+    background_tasks.add_task(
+        log_activity,
+        user_id=db_student.id,
+        action="Student Created",
+    )
+
     return db_student
 
 # READ (many)
@@ -104,12 +123,20 @@ def patch_student(
 # DELETE 
 @router.delete("/{student_id}", status_code=204)
 def delete_student(
+    background_tasks: BackgroundTasks,
     student_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
-    """Delete a student"""
+    """Delete a student."""
     db_student = get_student_or_404(db, student_id)
+    deleted_student_id = db_student.id
+
     db.delete(db_student)
     db.commit()
-    # 204 No Content - return nothing
+
+    background_tasks.add_task(
+        log_activity,
+        user_id=deleted_student_id,
+        action="Student Deleted",
+    )
