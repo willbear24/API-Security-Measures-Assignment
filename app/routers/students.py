@@ -19,14 +19,27 @@ def get_student_or_404(db: Session, student_id: int) -> Student:
     return student
 
 # CREATE
-@router.post("/", response_model=StudentResponse, status_code=201)
+@router.post(
+        "/", response_model=StudentResponse, status_code=201, 
+        responses={
+            422: {"description": "Validation error"},
+            401: {"description": "Not authenticated"},
+    },
+    summary="Create a new student"
+    )
+
 def create_student(
     student: StudentCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Create a new student."""
+    """Create a new student.
+
+    - Requires an authenticated user.
+    - Sends a welcome notification and records the activity in the background.
+    - Returns `409` when the email address is already registered.
+    """
     db_student = Student(**student.model_dump())
 
     try:
@@ -55,7 +68,14 @@ def create_student(
     return db_student
 
 # READ (many)
-@router.get("/", response_model=list[StudentResponse])
+@router.get(
+    "/",
+    response_model=list[StudentResponse],
+    responses={
+        422: {"description": "Invalid filter or pagination parameter"},
+    },
+    summary="List all students"
+)
 def list_students(
     name: Optional[str] = None,
     email: Optional[str] = None,
@@ -65,7 +85,12 @@ def list_students(
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    """List students with optional filters and pagination."""
+    """List students with optional filters and pagination.
+
+    - Filters by name, email, grade level, and enrollment status when provided.
+    - Uses `skip` and `limit` for pagination.
+    - Returns a list of student records.
+    """
     query = db.query(Student)
 
     if name is not None:
@@ -81,21 +106,50 @@ def list_students(
     return students
 
 # READ (one)
-@router.get("/{student_id}", response_model=StudentResponse)
+@router.get(
+    "/{student_id}",
+    response_model=StudentResponse,
+    responses={
+        404: {"description": "Student not found"},
+        422: {"description": "Invalid student ID"},
+    },
+    summary="Get a student by ID",
+)
 def get_student(student_id: int, db: Session = Depends(get_db)):
-    """Get a specific student by ID"""
+    """Get a specific student by ID.
+
+    - Looks up the student using the path parameter `student_id`.
+    - Returns `404` when no matching student exists.
+    """
     return get_student_or_404(db, student_id)
 
 # READ (current user)
-@router.get("/me", response_model=StudentResponse)
+@router.get(
+    "/me",
+    response_model=StudentResponse,
+    summary="Get the authenticated student's profile",
+)
 def get_my_profile(current_user: Student = Depends(get_current_user)):
-    """Return the authenticated user's profile."""
+    """Return the authenticated user's profile.
+
+    - Requires a valid bearer token.
+    - Returns the student associated with the authenticated user.
+    """
     return current_user
 
 # UPDATE (full - PUT)
-@router.put("/{student_id}", response_model=StudentResponse)
+@router.put(
+    "/{student_id}",
+    response_model=StudentResponse,
+    summary="Replace a student's data",
+)
 def update_student(student_id: int, student_data: StudentUpdate, db: Session = Depends(get_db)):
-    """Fully replace a student's data."""
+    """Fully replace a student's data.
+
+    - Replaces all updateable fields for the selected student.
+    - Requires a complete `StudentUpdate` request body.
+    - Returns `404` when no matching student exists.
+    """
     db_student = get_student_or_404(db, student_id)
     for field, value in student_data.model_dump().items():
         setattr(db_student, field, value)
@@ -104,14 +158,28 @@ def update_student(student_id: int, student_data: StudentUpdate, db: Session = D
     return db_student
 
 # UPDATE (partial - PATCH)
-@router.patch("/{student_id}", response_model=StudentResponse)
+@router.patch(
+    "/{student_id}",
+    response_model=StudentResponse,
+    responses={
+        401: {"description": "Not authenticated"},
+        404: {"description": "Student not found"},
+        422: {"description": "Validation error"},
+    },
+    summary="Partially update a student",
+)
 def patch_student(
     student_id: int,
     student_data: StudentPatch,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
-    """Partially update a student, only changing provided fields."""
+    """Partially update a student.
+
+    - Requires an authenticated user.
+    - Updates only the fields included in the request body.
+    - Returns `404` when no matching student exists.
+    """
     db_student = get_student_or_404(db, student_id)
     update_data = student_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -121,14 +189,24 @@ def patch_student(
     return db_student
 
 # DELETE 
-@router.delete("/{student_id}", status_code=204)
+@router.delete(
+    "/{student_id}",
+    status_code=204,
+    summary="Delete a student",
+)
 def delete_student(
     background_tasks: BackgroundTasks,
     student_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Delete a student."""
+    """Delete a student.
+
+    - Requires an authenticated user.
+    - Removes the selected student from the database.
+    - Records the deletion activity in the background.
+    - Returns `404` when no matching student exists.
+    """
     db_student = get_student_or_404(db, student_id)
     deleted_student_id = db_student.id
 

@@ -38,11 +38,23 @@ from app.limiter import limiter
 #   should be protected.
 # - CORS origins, JWT configuration, and rate-limit storage are local/demo
 #   settings; review them before deploying behind a proxy or multiple workers.
+tags_metadata = [
+    {"name": "Authentication", "description": "User registration and login. All protected endpoints require a Bearer token."},
+    {"name": "Students", "description": "CRUD operations for students. Some endpoints require authentication."},
+]
 
 app = FastAPI(
-    title=settings.app_name,
-    description="Student CRUD Demo API",
-    version="1.0.0"
+    title="""Student CRUD Demo API""",
+    description="""A full-featured student management API with JWT authentication, Pydantic validation and SQLAlchemy persistence.
+    
+    ## Quick Start
+    1. Register at `POST /auth/register`
+    2. Copy the `access_token` from the response,
+    3. Click **Authorize** above and paste the token,
+    4. Start creating and managing students! """,
+
+    version="1.0.0",
+    openapi_tags=tags_metadata,
 )
 
 app.add_middleware(
