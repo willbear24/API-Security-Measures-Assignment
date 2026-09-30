@@ -1,8 +1,15 @@
 # Create Pydantic schemas: StudentCreate, StudentUpdate (full), StudentPatch (partial), StudentResponse
 
-from pydantic import BaseModel, ConfigDict, Field
+import re
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from datetime import datetime
+
+
+def _strip_html_tags(value: str) -> str:
+    """Remove HTML/script tags (e.g. <script>) from user-supplied text."""
+    return re.sub(r"<[^>]*>", "", value)
+
 
 class StudentCreate(BaseModel):
     name: str = Field(
@@ -26,6 +33,7 @@ class StudentCreate(BaseModel):
     gpa: Optional[float] = Field(
         default=None,
         gt=0,
+        le=4.0,
         description="The student's grade point average",
         examples=[3.8],
     )
@@ -34,6 +42,11 @@ class StudentCreate(BaseModel):
         description="Whether the student is currently enrolled",
         examples=[True],
     )
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def sanitize_name(cls, value):
+        return _strip_html_tags(value) if isinstance(value, str) else value
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -46,6 +59,7 @@ class StudentCreate(BaseModel):
             }
         }
     )
+
 
 class StudentUpdate(BaseModel):
     name: str = Field(
@@ -69,6 +83,7 @@ class StudentUpdate(BaseModel):
     gpa: Optional[float] = Field(
         default=None,
         gt=0,
+        le=4.0,
         description="The student's grade point average",
         examples=[3.8],
     )
@@ -77,6 +92,11 @@ class StudentUpdate(BaseModel):
         description="Whether the student is currently enrolled",
         examples=[True],
     )
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def sanitize_name(cls, value):
+        return _strip_html_tags(value) if isinstance(value, str) else value
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -89,6 +109,7 @@ class StudentUpdate(BaseModel):
             }
         }
     )
+
 
 class StudentPatch(BaseModel):
     name: Optional[str] = Field(
@@ -115,6 +136,7 @@ class StudentPatch(BaseModel):
     gpa: Optional[float] = Field(
         default=None,
         gt=0,
+        le=4.0,
         description="The student's grade point average",
         examples=[3.8],
     )
@@ -123,6 +145,11 @@ class StudentPatch(BaseModel):
         description="Whether the student is currently enrolled",
         examples=[True],
     )
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def sanitize_name(cls, value):
+        return _strip_html_tags(value) if isinstance(value, str) else value
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -133,6 +160,7 @@ class StudentPatch(BaseModel):
         }
     )
 
+
 class StudentResponse(BaseModel):
     id: int = Field(description="The unique identifier for the student")
     name: str = Field(description="The student's full name")
@@ -141,9 +169,7 @@ class StudentResponse(BaseModel):
         description="The student's current grade level, from 1 through 12"
     )
     gpa: Optional[float] = Field(description="The student's grade point average")
-    is_enrolled: bool = Field(
-        description="Whether the student is currently enrolled"
-    )
+    is_enrolled: bool = Field(description="Whether the student is currently enrolled")
     created_at: datetime = Field(description="When the student record was created")
 
     model_config = ConfigDict(
@@ -160,5 +186,3 @@ class StudentResponse(BaseModel):
             }
         },
     )
-
-
